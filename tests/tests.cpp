@@ -19,6 +19,7 @@ std::vector<T> ToVector(const SequencePtr<T>& seq) {
     }
     return res;
 }
+//
 
 std::vector<size_t> AdjacentVertices(const Adjacents& adjs) {
     std::vector<size_t> res;
