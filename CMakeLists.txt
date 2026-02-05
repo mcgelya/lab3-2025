@@ -9,8 +9,7 @@ include(CTest)
 enable_testing()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(-g -fsanitize=undefined,address)
-    add_link_options(-g -fsanitize=undefined,address)
+    add_compile_options(-O0 -g)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")

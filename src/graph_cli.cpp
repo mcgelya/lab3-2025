@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "directed_graph.hpp"
-#include "fwd.hpp"
 #include "graph.hpp"
 #include "list_sequence.hpp"
 #include "shortest_paths.hpp"
@@ -111,20 +110,24 @@ void PrintPath(const SequencePtr<size_t>& path) {
     std::cout << "\n";
 }
 
-int64_t MeasureUs(IShortestPathsFinderPtr algo, size_t target) {
+template <typename Algo>
+int64_t MeasureUs(Algo&& make_algo, size_t target) {
     auto start = Clock::now();
-    auto dist = algo->GetDistance(target);
-    auto path = algo->GetShortestPath(target);
+    auto algo = make_algo();
+    auto dist = algo.GetDistance(target);
+    auto path = algo.GetShortestPath(target);
     (void)dist;
     (void)path;
     auto end = Clock::now();
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
-void RunAndReport(const std::string& name, IShortestPathsFinderPtr algo, size_t target) {
+template <typename Algo>
+void RunAndReport(const std::string& name, Algo&& make_algo, size_t target) {
     auto start = Clock::now();
-    auto dist = algo->GetDistance(target);
-    auto path = algo->GetShortestPath(target);
+    auto algo = make_algo();
+    auto dist = algo.GetDistance(target);
+    auto path = algo.GetShortestPath(target);
     auto end = Clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     std::cout << name << ": " << micros << " мкс\n";
@@ -148,10 +151,11 @@ size_t ClampEdges(size_t n, size_t edges_per_vertex, bool directed) {
 }
 
 std::vector<size_t> ReadSizes() {
-    std::cout << "Размеры графов по умолчанию: 100 500 1000 5000 10000. Использовать их? (Enter=да): ";
+    std::cout << "Размеры графов по умолчанию: 500 800 1000 2000 3000 4000 5000 6000 7000 8000 9000 10000. "
+                 "Использовать их? (Enter=да): ";
     std::string line = ReadLine();
     if (line.empty() || line[0] == 'y' || line[0] == 'Y') {
-        return {100, 500, 1000, 5000, 10000};
+        return {500, 800, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000};
     }
     std::cout << "Введите размеры через пробел и завершите 0: ";
     std::vector<size_t> res;
@@ -165,7 +169,7 @@ std::vector<size_t> ReadSizes() {
     }
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     if (res.empty()) {
-        res = {100, 500, 1000, 5000, 10000};
+        res = {500, 800, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000};
     }
     return res;
 }
@@ -213,13 +217,13 @@ void RunBenchmark() {
         size_t from = 0;
         size_t to = (n > 1) ? n - 1 : 0;
         try {
-            int64_t t = MeasureUs(std::make_shared<Dijkstra>(graph, from), to);
+            int64_t t = MeasureUs([&] { return Dijkstra(graph, from); }, to);
             results.push_back({n, m, directed, "Dijkstra", t});
         } catch (const std::exception& e) {
             std::cout << "Dijkstra пропущен для n=" << n << ": " << e.what() << "\n";
         }
         try {
-            int64_t t = MeasureUs(std::make_shared<FordBellman>(graph, from), to);
+            int64_t t = MeasureUs([&] { return FordBellman(graph, from); }, to);
             results.push_back({n, m, directed, "Bellman-Ford", t});
         } catch (const std::exception& e) {
             std::cout << "Bellman-Ford пропущен для n=" << n << ": " << e.what() << "\n";
@@ -282,13 +286,15 @@ int main() {
     size_t to = AskValue<size_t>("Целевая вершина (Enter=n-1): ", n ? n - 1 : 0);
 
     try {
-        RunAndReport("Dijkstra", std::make_shared<Dijkstra>(graph, from), to);
+        RunAndReport(
+            "Dijkstra", [&] { return Dijkstra(graph, from); }, to);
     } catch (const std::exception& e) {
         std::cout << "Dijkstra не выполнен: " << e.what() << "\n";
     }
 
     try {
-        RunAndReport("Bellman-Ford", std::make_shared<FordBellman>(graph, from), to);
+        RunAndReport(
+            "Bellman-Ford", [&] { return FordBellman(graph, from); }, to);
     } catch (const std::exception& e) {
         std::cout << "Bellman-Ford не выполнен: " << e.what() << "\n";
     }
