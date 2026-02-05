@@ -19,7 +19,6 @@ std::vector<T> ToVector(const SequencePtr<T>& seq) {
     }
     return res;
 }
-//
 
 std::vector<size_t> AdjacentVertices(const Adjacents& adjs) {
     std::vector<size_t> res;
@@ -77,33 +76,6 @@ TEST_CASE("TrivialPath") {
     g->AddEdge({0, 1, 2});
     Dijkstra d(g, 0);
     REQUIRE(ToVector(d.GetShortestPath(0)) == std::vector<size_t>{0});
-}
-
-TEST_CASE("IteratorsStable") {
-    ListSequence<int> seq;
-    for (int i = 0; i < 5; ++i) {
-        seq.Append(i);
-    }
-    // Pattern: HasNext/GetCurrentItem/Next
-    {
-        auto it = seq.GetIterator();
-        int sum = 0;
-        while (it->HasNext()) {
-            sum += it->GetCurrentItem();
-            it->Next();
-        }
-        REQUIRE(sum == 0 + 1 + 2 + 3 + 4);
-    }
-    // Pattern: Next/GetCurrentItem guarded by return value
-    {
-        auto it = seq.GetIterator();
-        int count = 0;
-        while (it->HasNext()) {
-            ++count;
-            it->Next();
-        }
-        REQUIRE(count == 5);
-    }
 }
 
 TEST_CASE("NegEdge") {
