@@ -24,9 +24,9 @@ std::vector<PathStep> ToPathSteps(const PathSteps& seq) {
     return ToVector(seq);
 }
 
-std::vector<size_t> AdjacentVertices(const Adjacents& adjs) {
+std::vector<size_t> ArcVertices(const Arcs& arcs) {
     std::vector<size_t> res;
-    auto it = adjs->GetIterator();
+    auto it = arcs->GetIterator();
     for (; it->HasNext(); it->Next()) {
         res.push_back(it->GetCurrentItem().vertex->id);
     }
@@ -41,9 +41,9 @@ TEST_CASE("Undirected") {
     REQUIRE(g.GetVertexCount() == 3);
     REQUIRE(g.GetEdgeCount() == 2);
 
-    auto adj0 = AdjacentVertices(g.GetAdjacent(0));
-    auto adj1 = AdjacentVertices(g.GetAdjacent(1));
-    auto adj2 = AdjacentVertices(g.GetAdjacent(2));
+    auto adj0 = ArcVertices(g.GetArcs(0));
+    auto adj1 = ArcVertices(g.GetArcs(1));
+    auto adj2 = ArcVertices(g.GetArcs(2));
 
     REQUIRE(adj0 == std::vector<size_t>{1});
     REQUIRE(adj1 == std::vector<size_t>{0, 2});
@@ -57,9 +57,9 @@ TEST_CASE("Directed") {
     REQUIRE(g->GetVertexCount() == 3);
     REQUIRE(g->GetEdgeCount() == 1);
 
-    REQUIRE(AdjacentVertices(g->GetAdjacent(0)) == std::vector<size_t>{1});
-    REQUIRE(AdjacentVertices(g->GetAdjacent(1)).empty());
-    REQUIRE(AdjacentVertices(g->GetAdjacent(2)).empty());
+    REQUIRE(ArcVertices(g->GetArcs(0)) == std::vector<size_t>{1});
+    REQUIRE(ArcVertices(g->GetArcs(1)).empty());
+    REQUIRE(ArcVertices(g->GetArcs(2)).empty());
 }
 
 TEST_CASE("Dijkstra") {

@@ -30,7 +30,7 @@ void DirectedGraph::AddEdge(const Edge& edge) {
     }
     VertexPtr from = GetVertex(edge.u);
     VertexPtr to = GetVertex(edge.v);
-    from->adjacents->Append({to, edge.transfer});
+    from->arcs->Append({to, edge.transfer});
     ++edge_count_;
 }
 
@@ -38,6 +38,6 @@ VertexPtr DirectedGraph::GetVertex(size_t v) const {
     return vertices_->Get(v);
 }
 
-Adjacents DirectedGraph::GetAdjacent(size_t v) const {
-    return GetVertex(v)->adjacents;
+Arcs DirectedGraph::GetArcs(size_t v) const {
+    return GetVertex(v)->arcs;
 }

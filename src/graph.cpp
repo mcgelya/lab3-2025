@@ -30,8 +30,8 @@ void Graph::AddEdge(const Edge& edge) {
     }
     VertexPtr from = GetVertex(edge.u);
     VertexPtr to = GetVertex(edge.v);
-    from->adjacents->Append({to, edge.transfer});
-    to->adjacents->Append({from, edge.transfer});
+    from->arcs->Append({to, edge.transfer});
+    to->arcs->Append({from, edge.transfer});
     ++edge_count_;
 }
 
@@ -39,6 +39,6 @@ VertexPtr Graph::GetVertex(size_t v) const {
     return vertices_->Get(v);
 }
 
-Adjacents Graph::GetAdjacent(size_t v) const {
-    return GetVertex(v)->adjacents;
+Arcs Graph::GetArcs(size_t v) const {
+    return GetVertex(v)->arcs;
 }

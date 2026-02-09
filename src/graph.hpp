@@ -16,7 +16,7 @@ public:
 
     VertexPtr GetVertex(size_t v) const override;
 
-    Adjacents GetAdjacent(size_t v) const override;
+    Arcs GetArcs(size_t v) const override;
 
 private:
     SequencePtr<VertexPtr> vertices_;

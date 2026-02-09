@@ -1,5 +1,6 @@
 #include "shortest_paths.hpp"
 
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -8,7 +9,7 @@
 #include "list_sequence.hpp"
 
 const int64_t kInf = 1'000'000'000'000'000'000;
-const size_t kNoState = kTransportCount;
+const size_t kNoState = std::numeric_limits<size_t>::max();
 const Transport kSourceTransport = Transport::Feet;
 
 static size_t EncodeState(size_t vertex, Transport transport) {
@@ -41,17 +42,6 @@ static size_t FindBestStateAtVertex(const SequencePtr<int64_t>& dist, size_t ver
     return best_state;
 }
 
-static bool TryAddCost(int64_t distance, int64_t edge_cost, int64_t& out) {
-    if (edge_cost > 0 && distance > kInf - edge_cost) {
-        return false;
-    }
-    if (edge_cost < 0 && distance < -kInf - edge_cost) {
-        return false;
-    }
-    out = distance + edge_cost;
-    return true;
-}
-
 Dijkstra::Dijkstra(IGraphPtr graph, size_t from)
     : dist_(std::make_shared<ArraySequence<int64_t>>(GetStateCount(graph->GetVertexCount()), kInf)),
       prev_(std::make_shared<ArraySequence<size_t>>(GetStateCount(graph->GetVertexCount()), kNoState)),
@@ -81,24 +71,20 @@ Dijkstra::Dijkstra(IGraphPtr graph, size_t from)
         const size_t vertex_id = DecodeVertex(state);
         const Transport current_transport = DecodeTransport(state);
         VertexPtr vertex = graph->GetVertex(vertex_id);
-        for (auto it = vertex->adjacents->GetIterator(); it->HasNext(); it->Next()) {
-            const Adjacent adjacent = it->GetCurrentItem();
-            if (adjacent.vertex == nullptr) {
+        for (auto it = vertex->arcs->GetIterator(); it->HasNext(); it->Next()) {
+            const Arc arc = it->GetCurrentItem();
+            if (arc.vertex == nullptr) {
                 throw std::runtime_error("Graph contains null adjacent vertex");
             }
-            const size_t to_vertex = adjacent.vertex->id;
+            const size_t to_vertex = arc.vertex->id;
             for (Transport next_transport : kAllTransports) {
-                const int64_t edge_cost = adjacent.transfer.GetCost(current_transport, next_transport);
-                if (edge_cost >= kNoTransferCost) {
-                    continue;
-                }
-                if (edge_cost < 0) {
-                    throw std::invalid_argument("Dijkstra does not support negative edge weights");
-                }
                 const size_t to_state = EncodeState(to_vertex, next_transport);
                 int64_t candidate = 0;
-                if (!TryAddCost(best_distance, edge_cost, candidate)) {
+                if (!arc.Combine(best_distance, current_transport, next_transport, candidate)) {
                     continue;
+                }
+                if (candidate < best_distance) {
+                    throw std::invalid_argument("Dijkstra does not support negative edge weights");
                 }
                 if (candidate < dist_->Get(to_state)) {
                     dist_->Set(candidate, to_state);
@@ -197,20 +183,16 @@ FordBellman::FordBellman(IGraphPtr graph, size_t from)
             const size_t vertex_id = DecodeVertex(state);
             const Transport current_transport = DecodeTransport(state);
             VertexPtr vertex = graph->GetVertex(vertex_id);
-            for (auto it = vertex->adjacents->GetIterator(); it->HasNext(); it->Next()) {
-                const Adjacent adjacent = it->GetCurrentItem();
-                if (adjacent.vertex == nullptr) {
+            for (auto it = vertex->arcs->GetIterator(); it->HasNext(); it->Next()) {
+                const Arc arc = it->GetCurrentItem();
+                if (arc.vertex == nullptr) {
                     throw std::runtime_error("Graph contains null adjacent vertex");
                 }
-                const size_t to_vertex = adjacent.vertex->id;
+                const size_t to_vertex = arc.vertex->id;
                 for (Transport next_transport : kAllTransports) {
-                    const int64_t edge_cost = adjacent.transfer.GetCost(current_transport, next_transport);
-                    if (edge_cost >= kNoTransferCost) {
-                        continue;
-                    }
                     const size_t to_state = EncodeState(to_vertex, next_transport);
                     int64_t candidate = 0;
-                    if (!TryAddCost(current_distance, edge_cost, candidate)) {
+                    if (!arc.Combine(current_distance, current_transport, next_transport, candidate)) {
                         continue;
                     }
                     if (candidate < dist_->Get(to_state)) {

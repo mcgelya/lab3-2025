@@ -74,22 +74,37 @@ struct Edge {
     TransferMatrix transfer;
 };
 
-struct Adjacent {
+struct Arc {
     VertexPtr vertex;
     TransferMatrix transfer;
+
+    bool Combine(int64_t current_weight, Transport from, Transport to, int64_t& combined_weight) const {
+        const int64_t step_cost = transfer.GetCost(from, to);
+        if (step_cost >= kNoTransferCost) {
+            return false;
+        }
+        if (step_cost > 0 && current_weight > std::numeric_limits<int64_t>::max() - step_cost) {
+            return false;
+        }
+        if (step_cost < 0 && current_weight < std::numeric_limits<int64_t>::min() - step_cost) {
+            return false;
+        }
+        combined_weight = current_weight + step_cost;
+        return true;
+    }
 };
 
-using Adjacents = SequencePtr<Adjacent>;
+using Arcs = SequencePtr<Arc>;
 
 struct Vertex {
-    explicit Vertex(size_t id_) : id(id_), adjacents(std::make_shared<ListSequence<Adjacent>>()) {
+    explicit Vertex(size_t id_) : id(id_), arcs(std::make_shared<ListSequence<Arc>>()) {
     }
 
     Vertex() : Vertex(0) {
     }
 
     size_t id;
-    Adjacents adjacents;
+    Arcs arcs;
 };
 
 class IGraph {
@@ -104,5 +119,5 @@ public:
 
     virtual VertexPtr GetVertex(size_t v) const = 0;
 
-    virtual Adjacents GetAdjacent(size_t v) const = 0;
+    virtual Arcs GetArcs(size_t v) const = 0;
 };
