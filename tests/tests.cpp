@@ -24,7 +24,7 @@ std::vector<size_t> AdjacentVertices(const Adjacents& adjs) {
     std::vector<size_t> res;
     auto it = adjs->GetIterator();
     for (; it->HasNext(); it->Next()) {
-        res.push_back(it->GetCurrentItem().v);
+        res.push_back(it->GetCurrentItem().vertex->id);
     }
     return res;
 }
@@ -33,6 +33,9 @@ TEST_CASE("Undirected") {
     Graph g(3);
     g.AddEdge({0, 1, 7});
     g.AddEdge({1, 2, 2});
+
+    REQUIRE(g.GetVertexCount() == 3);
+    REQUIRE(g.GetEdgeCount() == 2);
 
     auto adj0 = AdjacentVertices(g.GetAdjacent(0));
     auto adj1 = AdjacentVertices(g.GetAdjacent(1));
@@ -46,6 +49,9 @@ TEST_CASE("Undirected") {
 TEST_CASE("Directed") {
     auto g = std::make_shared<DirectedGraph>(3);
     g->AddEdge({0, 1, 5});
+
+    REQUIRE(g->GetVertexCount() == 3);
+    REQUIRE(g->GetEdgeCount() == 1);
 
     REQUIRE(AdjacentVertices(g->GetAdjacent(0)) == std::vector<size_t>{1});
     REQUIRE(AdjacentVertices(g->GetAdjacent(1)).empty());

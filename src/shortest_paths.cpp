@@ -1,6 +1,5 @@
 #include "shortest_paths.hpp"
 
-#include <limits>
 #include <stdexcept>
 
 #include "array_sequence.hpp"
@@ -10,10 +9,10 @@
 constexpr int64_t kInf = 1000000000000000000;
 
 Dijkstra::Dijkstra(IGraphPtr graph, size_t from)
-    : dist_(std::make_shared<ArraySequence<int64_t>>(graph->GetSize(), kInf)),
-      prev_(std::make_shared<ArraySequence<size_t>>(graph->GetSize())),
+    : dist_(std::make_shared<ArraySequence<int64_t>>(graph->GetVertexCount(), kInf)),
+      prev_(std::make_shared<ArraySequence<size_t>>(graph->GetVertexCount())),
       from_(from) {
-    size_t n = graph->GetSize();
+    size_t n = graph->GetVertexCount();
     if (from >= n) {
         throw std::out_of_range("Source vertex is out of range");
     }
@@ -32,14 +31,19 @@ Dijkstra::Dijkstra(IGraphPtr graph, size_t from)
             break;
         }
         used->Set(true, u);
-        for (auto it = graph->GetAdjacent(u)->GetIterator(); it->HasNext(); it->Next()) {
+        VertexPtr vertex = graph->GetVertex(u);
+        for (auto it = vertex->adjacents->GetIterator(); it->HasNext(); it->Next()) {
             auto cur = it->GetCurrentItem();
+            if (cur.vertex == nullptr) {
+                throw std::runtime_error("Graph contains null adjacent vertex");
+            }
             if (cur.w < 0) {
                 throw std::invalid_argument("Dijkstra does not support negative edge weights");
             }
-            if (mn_dist + cur.w < dist_->Get(cur.v)) {
-                dist_->Set(mn_dist + cur.w, cur.v);
-                prev_->Set(u, cur.v);
+            const size_t to = cur.vertex->id;
+            if (mn_dist + cur.w < dist_->Get(to)) {
+                dist_->Set(mn_dist + cur.w, to);
+                prev_->Set(u, to);
             }
         }
     }
@@ -63,13 +67,13 @@ SequencePtr<size_t> Dijkstra::GetShortestPath(size_t to) const {
 }
 
 FordBellman::FordBellman(IGraphPtr graph, size_t from)
-    : dist_(std::make_shared<ArraySequence<int64_t>>(graph->GetSize(), kInf)),
-      prev_(std::make_shared<ArraySequence<size_t>>(graph->GetSize())),
+    : dist_(std::make_shared<ArraySequence<int64_t>>(graph->GetVertexCount(), kInf)),
+      prev_(std::make_shared<ArraySequence<size_t>>(graph->GetVertexCount())),
       from_(from) {
-    if (from >= graph->GetSize()) {
+    if (from >= graph->GetVertexCount()) {
         throw std::out_of_range("Source vertex is out of range");
     }
-    size_t n = graph->GetSize();
+    size_t n = graph->GetVertexCount();
     dist_->Set(0, from);
     for (size_t iteration = 0; iteration + 1 < n; ++iteration) {
         bool updated = false;
@@ -78,11 +82,16 @@ FordBellman::FordBellman(IGraphPtr graph, size_t from)
             if (du == kInf) {
                 continue;
             }
-            for (auto it = graph->GetAdjacent(u)->GetIterator(); it->HasNext(); it->Next()) {
+            VertexPtr vertex = graph->GetVertex(u);
+            for (auto it = vertex->adjacents->GetIterator(); it->HasNext(); it->Next()) {
                 auto cur = it->GetCurrentItem();
-                if (du + cur.w < dist_->Get(cur.v)) {
-                    dist_->Set(du + cur.w, cur.v);
-                    prev_->Set(u, cur.v);
+                if (cur.vertex == nullptr) {
+                    throw std::runtime_error("Graph contains null adjacent vertex");
+                }
+                const size_t to = cur.vertex->id;
+                if (du + cur.w < dist_->Get(to)) {
+                    dist_->Set(du + cur.w, to);
+                    prev_->Set(u, to);
                     updated = true;
                 }
             }

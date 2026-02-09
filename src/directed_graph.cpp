@@ -1,36 +1,43 @@
 #include "directed_graph.hpp"
 
-#include "array_sequence.hpp"
-#include "list_sequence.hpp"
+#include <stdexcept>
 
-DirectedGraph::DirectedGraph(size_t n) : graph_(std::make_shared<ArraySequence<Adjacents>>(n)) {
+#include "array_sequence.hpp"
+
+DirectedGraph::DirectedGraph(size_t n) : vertices_(std::make_shared<ArraySequence<VertexPtr>>(n)) {
+    for (size_t i = 0; i < n; ++i) {
+        vertices_->Set(std::make_shared<Vertex>(i), i);
+    }
 }
 
-DirectedGraph::DirectedGraph(size_t n, SequencePtr<Edge> edges)
-    : graph_(std::make_shared<ArraySequence<Adjacents>>(n)) {
+DirectedGraph::DirectedGraph(size_t n, SequencePtr<Edge> edges) : DirectedGraph(n) {
     for (auto it = edges->GetIterator(); it->HasNext(); it->Next()) {
         AddEdge(it->GetCurrentItem());
     }
 }
 
-size_t DirectedGraph::GetSize() const {
-    return graph_->GetLength();
+size_t DirectedGraph::GetVertexCount() const {
+    return vertices_->GetLength();
+}
+
+size_t DirectedGraph::GetEdgeCount() const {
+    return edge_count_;
 }
 
 void DirectedGraph::AddEdge(const Edge& edge) {
-    auto adjs = graph_->Get(edge.u);
-    if (adjs == nullptr) {
-        adjs = std::make_shared<ListSequence<Adjacent>>();
-        graph_->Set(adjs, edge.u);
+    if (edge.u >= GetVertexCount() || edge.v >= GetVertexCount()) {
+        throw std::out_of_range("Vertex index is out of range");
     }
-    adjs->Append({edge.v, edge.w});
+    VertexPtr from = GetVertex(edge.u);
+    VertexPtr to = GetVertex(edge.v);
+    from->adjacents->Append({to, edge.w});
+    ++edge_count_;
+}
+
+VertexPtr DirectedGraph::GetVertex(size_t v) const {
+    return vertices_->Get(v);
 }
 
 Adjacents DirectedGraph::GetAdjacent(size_t v) const {
-    auto adjs = graph_->Get(v);
-    if (adjs == nullptr) {
-        adjs = std::make_shared<ListSequence<Adjacent>>();
-        graph_->Set(adjs, v);
-    }
-    return adjs;
+    return GetVertex(v)->adjacents;
 }

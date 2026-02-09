@@ -8,12 +8,17 @@ public:
 
     DirectedGraph(size_t n, SequencePtr<Edge> edges);
 
-    size_t GetSize() const override;
+    size_t GetVertexCount() const override;
+
+    size_t GetEdgeCount() const override;
 
     void AddEdge(const Edge& edge) override;
+
+    VertexPtr GetVertex(size_t v) const override;
 
     Adjacents GetAdjacent(size_t v) const override;
 
 private:
-    SequencePtr<Adjacents> graph_;
+    SequencePtr<VertexPtr> vertices_;
+    size_t edge_count_ = 0;
 };
