@@ -1,20 +1,82 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+
 #include "fwd.hpp"
 #include "list_sequence.hpp"
 
-struct Vertex;
+enum class Transport : uint8_t {
+    Bus = 0,
+    Car = 1,
+    Feet = 2,
+};
 
-using VertexPtr = std::shared_ptr<Vertex>;
+constexpr size_t kTransportCount = 3;
+
+constexpr size_t ToTransportIndex(Transport transport) {
+    return static_cast<size_t>(transport);
+}
+
+constexpr std::array<Transport, kTransportCount> kAllTransports = {
+    Transport::Bus,
+    Transport::Car,
+    Transport::Feet,
+};
+
+constexpr int64_t kNoTransferCost = std::numeric_limits<int64_t>::max() / 4;
+
+struct TransferMatrix {
+    std::array<std::array<int64_t, kTransportCount>, kTransportCount> cost{};
+
+    TransferMatrix() {
+        for (auto& row : cost) {
+            row.fill(kNoTransferCost);
+        }
+    }
+
+    static TransferMatrix Diagonal(int64_t diagonal_cost) {
+        TransferMatrix matrix;
+        for (size_t i = 0; i < kTransportCount; ++i) {
+            matrix.cost[i][i] = diagonal_cost;
+        }
+        return matrix;
+    }
+
+    static TransferMatrix Uniform(int64_t c) {
+        TransferMatrix matrix;
+        for (auto& row : matrix.cost) {
+            row.fill(c);
+        }
+        return matrix;
+    }
+
+    int64_t GetCost(Transport from, Transport to) const {
+        return cost[ToTransportIndex(from)][ToTransportIndex(to)];
+    }
+
+    void SetCost(Transport from, Transport to, int64_t c) {
+        cost[ToTransportIndex(from)][ToTransportIndex(to)] = c;
+    }
+};
 
 struct Edge {
-    size_t u, v;
-    int64_t w = 1;
+    Edge(size_t u_, size_t v_, int64_t w = 1) : u(u_), v(v_), transfer(TransferMatrix::Diagonal(w)) {
+    }
+
+    Edge(size_t u_, size_t v_, const TransferMatrix& transfer_) : u(u_), v(v_), transfer(transfer_) {
+    }
+
+    size_t u;
+    size_t v;
+    TransferMatrix transfer;
 };
 
 struct Adjacent {
     VertexPtr vertex;
-    int64_t w;
+    TransferMatrix transfer;
 };
 
 using Adjacents = SequencePtr<Adjacent>;

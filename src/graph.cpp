@@ -30,8 +30,8 @@ void Graph::AddEdge(const Edge& edge) {
     }
     VertexPtr from = GetVertex(edge.u);
     VertexPtr to = GetVertex(edge.v);
-    from->adjacents->Append({to, edge.w});
-    to->adjacents->Append({from, edge.w});
+    from->adjacents->Append({to, edge.transfer});
+    to->adjacents->Append({from, edge.transfer});
     ++edge_count_;
 }
 

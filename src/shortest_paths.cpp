@@ -1,98 +1,223 @@
 #include "shortest_paths.hpp"
 
 #include <stdexcept>
+#include <vector>
 
 #include "array_sequence.hpp"
 #include "igraph.hpp"
 #include "list_sequence.hpp"
 
-constexpr int64_t kInf = 1000000000000000000;
+const int64_t kInf = 1'000'000'000'000'000'000;
+const size_t kNoState = kTransportCount;
+const Transport kSourceTransport = Transport::Feet;
+
+static size_t EncodeState(size_t vertex, Transport transport) {
+    return vertex * kTransportCount + ToTransportIndex(transport);
+}
+
+static size_t DecodeVertex(size_t state) {
+    return state / kTransportCount;
+}
+
+static Transport DecodeTransport(size_t state) {
+    return static_cast<Transport>(state % kTransportCount);
+}
+
+static size_t GetStateCount(size_t vertex_count) {
+    return vertex_count * kTransportCount;
+}
+
+static size_t FindBestStateAtVertex(const SequencePtr<int64_t>& dist, size_t vertex) {
+    size_t best_state = kNoState;
+    int64_t best_distance = kInf;
+    for (Transport transport : kAllTransports) {
+        const size_t state = EncodeState(vertex, transport);
+        const int64_t candidate = dist->Get(state);
+        if (candidate < best_distance) {
+            best_distance = candidate;
+            best_state = state;
+        }
+    }
+    return best_state;
+}
+
+static bool TryAddCost(int64_t distance, int64_t edge_cost, int64_t& out) {
+    if (edge_cost > 0 && distance > kInf - edge_cost) {
+        return false;
+    }
+    if (edge_cost < 0 && distance < -kInf - edge_cost) {
+        return false;
+    }
+    out = distance + edge_cost;
+    return true;
+}
 
 Dijkstra::Dijkstra(IGraphPtr graph, size_t from)
-    : dist_(std::make_shared<ArraySequence<int64_t>>(graph->GetVertexCount(), kInf)),
-      prev_(std::make_shared<ArraySequence<size_t>>(graph->GetVertexCount())),
-      from_(from) {
-    size_t n = graph->GetVertexCount();
-    if (from >= n) {
+    : dist_(std::make_shared<ArraySequence<int64_t>>(GetStateCount(graph->GetVertexCount()), kInf)),
+      prev_(std::make_shared<ArraySequence<size_t>>(GetStateCount(graph->GetVertexCount()), kNoState)),
+      from_state_(EncodeState(from, kSourceTransport)),
+      vertex_count_(graph->GetVertexCount()) {
+    if (from >= vertex_count_) {
         throw std::out_of_range("Source vertex is out of range");
     }
-    auto used = std::make_shared<ArraySequence<bool>>(n);
-    dist_->Set(0, from);
-    for (size_t iteration = 0; iteration < n; ++iteration) {
-        size_t u = 0;
-        int64_t mn_dist = kInf;
-        for (size_t v = 0; v < n; ++v) {
-            if (!used->Get(v) && dist_->Get(v) < mn_dist) {
-                u = v;
-                mn_dist = dist_->Get(v);
+    const size_t state_count = GetStateCount(vertex_count_);
+    auto used = std::make_shared<ArraySequence<bool>>(state_count);
+    dist_->Set(0, from_state_);
+
+    for (size_t iteration = 0; iteration < state_count; ++iteration) {
+        size_t state = kNoState;
+        int64_t best_distance = kInf;
+        for (size_t s = 0; s < state_count; ++s) {
+            if (!used->Get(s) && dist_->Get(s) < best_distance) {
+                state = s;
+                best_distance = dist_->Get(s);
             }
         }
-        if (mn_dist == kInf) {
+        if (state == kNoState || best_distance == kInf) {
             break;
         }
-        used->Set(true, u);
-        VertexPtr vertex = graph->GetVertex(u);
+        used->Set(true, state);
+
+        const size_t vertex_id = DecodeVertex(state);
+        const Transport current_transport = DecodeTransport(state);
+        VertexPtr vertex = graph->GetVertex(vertex_id);
         for (auto it = vertex->adjacents->GetIterator(); it->HasNext(); it->Next()) {
-            auto cur = it->GetCurrentItem();
-            if (cur.vertex == nullptr) {
+            const Adjacent adjacent = it->GetCurrentItem();
+            if (adjacent.vertex == nullptr) {
                 throw std::runtime_error("Graph contains null adjacent vertex");
             }
-            if (cur.w < 0) {
-                throw std::invalid_argument("Dijkstra does not support negative edge weights");
-            }
-            const size_t to = cur.vertex->id;
-            if (mn_dist + cur.w < dist_->Get(to)) {
-                dist_->Set(mn_dist + cur.w, to);
-                prev_->Set(u, to);
+            const size_t to_vertex = adjacent.vertex->id;
+            for (Transport next_transport : kAllTransports) {
+                const int64_t edge_cost = adjacent.transfer.GetCost(current_transport, next_transport);
+                if (edge_cost >= kNoTransferCost) {
+                    continue;
+                }
+                if (edge_cost < 0) {
+                    throw std::invalid_argument("Dijkstra does not support negative edge weights");
+                }
+                const size_t to_state = EncodeState(to_vertex, next_transport);
+                int64_t candidate = 0;
+                if (!TryAddCost(best_distance, edge_cost, candidate)) {
+                    continue;
+                }
+                if (candidate < dist_->Get(to_state)) {
+                    dist_->Set(candidate, to_state);
+                    prev_->Set(state, to_state);
+                }
             }
         }
     }
 }
 
 int64_t Dijkstra::GetDistance(size_t to) const {
-    return dist_->Get(to);
+    if (to >= vertex_count_) {
+        throw std::out_of_range("Target vertex is out of range");
+    }
+    const size_t best_state = FindBestStateAtVertex(dist_, to);
+    return best_state == kNoState ? kInf : dist_->Get(best_state);
+}
+
+PathSteps Dijkstra::GetShortestPathWithTransfers(size_t to) const {
+    if (to >= vertex_count_) {
+        throw std::out_of_range("Target vertex is out of range");
+    }
+    const size_t best_state = FindBestStateAtVertex(dist_, to);
+    if (best_state == kNoState || dist_->Get(best_state) == kInf) {
+        return nullptr;
+    }
+
+    std::vector<size_t> reversed_states;
+    for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
+        reversed_states.push_back(state);
+        if (state == from_state_) {
+            break;
+        }
+    }
+    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+        return nullptr;
+    }
+
+    auto res = std::make_shared<ListSequence<PathStep>>();
+    for (size_t i = reversed_states.size(); i > 0; --i) {
+        const size_t state = reversed_states[i - 1];
+        res->Append({DecodeVertex(state), DecodeTransport(state)});
+    }
+    return res;
 }
 
 SequencePtr<size_t> Dijkstra::GetShortestPath(size_t to) const {
-    if (dist_->Get(to) == kInf) {
+    if (to >= vertex_count_) {
+        throw std::out_of_range("Target vertex is out of range");
+    }
+    const size_t best_state = FindBestStateAtVertex(dist_, to);
+    if (best_state == kNoState || dist_->Get(best_state) == kInf) {
         return nullptr;
     }
+
+    std::vector<size_t> reversed_states;
+    for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
+        reversed_states.push_back(state);
+        if (state == from_state_) {
+            break;
+        }
+    }
+    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+        return nullptr;
+    }
+
     auto res = std::make_shared<ListSequence<size_t>>();
-    res->Prepend(to);
-    while (to != from_) {
-        to = prev_->Get(to);
-        res->Prepend(to);
+    for (size_t i = reversed_states.size(); i > 0; --i) {
+        const size_t vertex = DecodeVertex(reversed_states[i - 1]);
+        if (res->GetLength() == 0 || res->GetLast() != vertex) {
+            res->Append(vertex);
+        }
     }
     return res;
 }
 
 FordBellman::FordBellman(IGraphPtr graph, size_t from)
-    : dist_(std::make_shared<ArraySequence<int64_t>>(graph->GetVertexCount(), kInf)),
-      prev_(std::make_shared<ArraySequence<size_t>>(graph->GetVertexCount())),
-      from_(from) {
-    if (from >= graph->GetVertexCount()) {
+    : dist_(std::make_shared<ArraySequence<int64_t>>(GetStateCount(graph->GetVertexCount()), kInf)),
+      prev_(std::make_shared<ArraySequence<size_t>>(GetStateCount(graph->GetVertexCount()), kNoState)),
+      from_state_(EncodeState(from, kSourceTransport)),
+      vertex_count_(graph->GetVertexCount()) {
+    if (from >= vertex_count_) {
         throw std::out_of_range("Source vertex is out of range");
     }
-    size_t n = graph->GetVertexCount();
-    dist_->Set(0, from);
-    for (size_t iteration = 0; iteration + 1 < n; ++iteration) {
+
+    const size_t state_count = GetStateCount(vertex_count_);
+    dist_->Set(0, from_state_);
+    for (size_t iteration = 0; iteration + 1 < state_count; ++iteration) {
         bool updated = false;
-        for (size_t u = 0; u < n; ++u) {
-            int64_t du = dist_->Get(u);
-            if (du == kInf) {
+        for (size_t state = 0; state < state_count; ++state) {
+            const int64_t current_distance = dist_->Get(state);
+            if (current_distance == kInf) {
                 continue;
             }
-            VertexPtr vertex = graph->GetVertex(u);
+
+            const size_t vertex_id = DecodeVertex(state);
+            const Transport current_transport = DecodeTransport(state);
+            VertexPtr vertex = graph->GetVertex(vertex_id);
             for (auto it = vertex->adjacents->GetIterator(); it->HasNext(); it->Next()) {
-                auto cur = it->GetCurrentItem();
-                if (cur.vertex == nullptr) {
+                const Adjacent adjacent = it->GetCurrentItem();
+                if (adjacent.vertex == nullptr) {
                     throw std::runtime_error("Graph contains null adjacent vertex");
                 }
-                const size_t to = cur.vertex->id;
-                if (du + cur.w < dist_->Get(to)) {
-                    dist_->Set(du + cur.w, to);
-                    prev_->Set(u, to);
-                    updated = true;
+                const size_t to_vertex = adjacent.vertex->id;
+                for (Transport next_transport : kAllTransports) {
+                    const int64_t edge_cost = adjacent.transfer.GetCost(current_transport, next_transport);
+                    if (edge_cost >= kNoTransferCost) {
+                        continue;
+                    }
+                    const size_t to_state = EncodeState(to_vertex, next_transport);
+                    int64_t candidate = 0;
+                    if (!TryAddCost(current_distance, edge_cost, candidate)) {
+                        continue;
+                    }
+                    if (candidate < dist_->Get(to_state)) {
+                        dist_->Set(candidate, to_state);
+                        prev_->Set(state, to_state);
+                        updated = true;
+                    }
                 }
             }
         }
@@ -103,18 +228,67 @@ FordBellman::FordBellman(IGraphPtr graph, size_t from)
 }
 
 int64_t FordBellman::GetDistance(size_t to) const {
-    return dist_->Get(to);
+    if (to >= vertex_count_) {
+        throw std::out_of_range("Target vertex is out of range");
+    }
+    const size_t best_state = FindBestStateAtVertex(dist_, to);
+    return best_state == kNoState ? kInf : dist_->Get(best_state);
+}
+
+PathSteps FordBellman::GetShortestPathWithTransfers(size_t to) const {
+    if (to >= vertex_count_) {
+        throw std::out_of_range("Target vertex is out of range");
+    }
+    const size_t best_state = FindBestStateAtVertex(dist_, to);
+    if (best_state == kNoState || dist_->Get(best_state) == kInf) {
+        return nullptr;
+    }
+
+    std::vector<size_t> reversed_states;
+    for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
+        reversed_states.push_back(state);
+        if (state == from_state_) {
+            break;
+        }
+    }
+    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+        return nullptr;
+    }
+
+    auto res = std::make_shared<ListSequence<PathStep>>();
+    for (size_t i = reversed_states.size(); i > 0; --i) {
+        const size_t state = reversed_states[i - 1];
+        res->Append({DecodeVertex(state), DecodeTransport(state)});
+    }
+    return res;
 }
 
 SequencePtr<size_t> FordBellman::GetShortestPath(size_t to) const {
-    if (dist_->Get(to) == kInf) {
+    if (to >= vertex_count_) {
+        throw std::out_of_range("Target vertex is out of range");
+    }
+    const size_t best_state = FindBestStateAtVertex(dist_, to);
+    if (best_state == kNoState || dist_->Get(best_state) == kInf) {
         return nullptr;
     }
+
+    std::vector<size_t> reversed_states;
+    for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
+        reversed_states.push_back(state);
+        if (state == from_state_) {
+            break;
+        }
+    }
+    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+        return nullptr;
+    }
+
     auto res = std::make_shared<ListSequence<size_t>>();
-    res->Prepend(to);
-    while (to != from_) {
-        to = prev_->Get(to);
-        res->Prepend(to);
+    for (size_t i = reversed_states.size(); i > 0; --i) {
+        const size_t vertex = DecodeVertex(reversed_states[i - 1]);
+        if (res->GetLength() == 0 || res->GetLast() != vertex) {
+            res->Append(vertex);
+        }
     }
     return res;
 }

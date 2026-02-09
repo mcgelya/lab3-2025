@@ -1,6 +1,15 @@
 #pragma once
 
-#include "fwd.hpp"
+#include <cstdint>
+
+#include "igraph.hpp"
+
+struct PathStep {
+    size_t vertex = 0;
+    Transport transport = Transport::Feet;
+};
+
+using PathSteps = SequencePtr<PathStep>;
 
 class IShortestPathsFinder {
 public:
@@ -9,4 +18,6 @@ public:
     virtual int64_t GetDistance(size_t to) const = 0;
 
     virtual SequencePtr<size_t> GetShortestPath(size_t to) const = 0;
+
+    virtual PathSteps GetShortestPathWithTransfers(size_t to) const = 0;
 };

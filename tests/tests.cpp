@@ -20,6 +20,10 @@ std::vector<T> ToVector(const SequencePtr<T>& seq) {
     return res;
 }
 
+std::vector<PathStep> ToPathSteps(const PathSteps& seq) {
+    return ToVector(seq);
+}
+
 std::vector<size_t> AdjacentVertices(const Adjacents& adjs) {
     std::vector<size_t> res;
     auto it = adjs->GetIterator();
@@ -117,4 +121,47 @@ TEST_CASE("Unreachable") {
 
     FordBellman bf(g, 0);
     REQUIRE(bf.GetShortestPath(2) == nullptr);
+}
+
+TEST_CASE("TransportStatefulShortestPath") {
+    auto edges = std::make_shared<ListSequence<Edge>>();
+
+    TransferMatrix t01;
+    t01.SetCost(Transport::Feet, Transport::Feet, 5);
+    t01.SetCost(Transport::Feet, Transport::Bus, 1);
+    edges->Append(Edge(0, 1, t01));
+
+    TransferMatrix t12;
+    t12.SetCost(Transport::Bus, Transport::Bus, 1);
+    t12.SetCost(Transport::Feet, Transport::Feet, 5);
+    edges->Append(Edge(1, 2, t12));
+
+    TransferMatrix t02 = TransferMatrix::Diagonal(4);
+    edges->Append(Edge(0, 2, t02));
+
+    auto g = std::make_shared<DirectedGraph>(3, edges);
+
+    Dijkstra dijkstra(g, 0);
+    REQUIRE(dijkstra.GetDistance(2) == 2);
+    REQUIRE(ToVector(dijkstra.GetShortestPath(2)) == std::vector<size_t>{0, 1, 2});
+    auto d_path = ToPathSteps(dijkstra.GetShortestPathWithTransfers(2));
+    REQUIRE(d_path.size() == 3);
+    REQUIRE(d_path[0].vertex == 0);
+    REQUIRE(d_path[0].transport == Transport::Feet);
+    REQUIRE(d_path[1].vertex == 1);
+    REQUIRE(d_path[1].transport == Transport::Bus);
+    REQUIRE(d_path[2].vertex == 2);
+    REQUIRE(d_path[2].transport == Transport::Bus);
+
+    FordBellman bellman(g, 0);
+    REQUIRE(bellman.GetDistance(2) == 2);
+    REQUIRE(ToVector(bellman.GetShortestPath(2)) == std::vector<size_t>{0, 1, 2});
+    auto b_path = ToPathSteps(bellman.GetShortestPathWithTransfers(2));
+    REQUIRE(b_path.size() == 3);
+    REQUIRE(b_path[0].vertex == 0);
+    REQUIRE(b_path[0].transport == Transport::Feet);
+    REQUIRE(b_path[1].vertex == 1);
+    REQUIRE(b_path[1].transport == Transport::Bus);
+    REQUIRE(b_path[2].vertex == 2);
+    REQUIRE(b_path[2].transport == Transport::Bus);
 }

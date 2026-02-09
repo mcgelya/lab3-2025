@@ -110,14 +110,40 @@ void PrintPath(const SequencePtr<size_t>& path) {
     std::cout << "\n";
 }
 
+const char* TransportName(Transport transport) {
+    switch (transport) {
+        case Transport::Bus:
+            return "bus";
+        case Transport::Car:
+            return "car";
+        case Transport::Feet:
+            return "feet";
+    }
+    return "unknown";
+}
+
+void PrintPathWithTransfers(const PathSteps& path) {
+    if (path == nullptr) {
+        std::cout << "  details: no path\n";
+        return;
+    }
+    std::cout << "  details:\n";
+    for (auto it = path->GetIterator(); it->HasNext(); it->Next()) {
+        const PathStep step = it->GetCurrentItem();
+        std::cout << "    v=" << step.vertex << " transport=" << TransportName(step.transport) << "\n";
+    }
+}
+
 template <typename Algo>
 int64_t MeasureUs(Algo&& make_algo, size_t target) {
     auto start = Clock::now();
     auto algo = make_algo();
     auto dist = algo.GetDistance(target);
     auto path = algo.GetShortestPath(target);
+    auto details = algo.GetShortestPathWithTransfers(target);
     (void)dist;
     (void)path;
+    (void)details;
     auto end = Clock::now();
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
@@ -128,12 +154,14 @@ void RunAndReport(const std::string& name, Algo&& make_algo, size_t target) {
     auto algo = make_algo();
     auto dist = algo.GetDistance(target);
     auto path = algo.GetShortestPath(target);
+    auto details = algo.GetShortestPathWithTransfers(target);
     auto end = Clock::now();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     std::cout << name << ": " << micros << " мкс\n";
     std::cout << "  distance to " << target << " = " << dist << "\n";
     std::cout << "  path: ";
     PrintPath(path);
+    PrintPathWithTransfers(details);
 }
 
 struct BenchResult {

@@ -30,7 +30,7 @@ void DirectedGraph::AddEdge(const Edge& edge) {
     }
     VertexPtr from = GetVertex(edge.u);
     VertexPtr to = GetVertex(edge.v);
-    from->adjacents->Append({to, edge.w});
+    from->adjacents->Append({to, edge.transfer});
     ++edge_count_;
 }
 
