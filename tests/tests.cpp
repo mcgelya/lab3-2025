@@ -20,10 +20,6 @@ std::vector<T> ToVector(const SequencePtr<T>& seq) {
     return res;
 }
 
-std::vector<PathStep> ToPathSteps(const PathSteps& seq) {
-    return ToVector(seq);
-}
-
 std::vector<size_t> ArcVertices(const Arcs& arcs) {
     std::vector<size_t> res;
     auto it = arcs->GetIterator();
@@ -144,7 +140,7 @@ TEST_CASE("TransportStatefulShortestPath") {
     Dijkstra dijkstra(g, 0);
     REQUIRE(dijkstra.GetDistance(2) == 2);
     REQUIRE(ToVector(dijkstra.GetShortestPath(2)) == std::vector<size_t>{0, 1, 2});
-    auto d_path = ToPathSteps(dijkstra.GetShortestPathWithTransfers(2));
+    auto d_path = ToVector(dijkstra.GetShortestPathWithTransfers(2));
     REQUIRE(d_path.size() == 3);
     REQUIRE(d_path[0].vertex == 0);
     REQUIRE(d_path[0].transport == Transport::Feet);
@@ -156,7 +152,7 @@ TEST_CASE("TransportStatefulShortestPath") {
     FordBellman bellman(g, 0);
     REQUIRE(bellman.GetDistance(2) == 2);
     REQUIRE(ToVector(bellman.GetShortestPath(2)) == std::vector<size_t>{0, 1, 2});
-    auto b_path = ToPathSteps(bellman.GetShortestPathWithTransfers(2));
+    auto b_path = ToVector(bellman.GetShortestPathWithTransfers(2));
     REQUIRE(b_path.size() == 3);
     REQUIRE(b_path[0].vertex == 0);
     REQUIRE(b_path[0].transport == Transport::Feet);

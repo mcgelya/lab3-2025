@@ -1,15 +1,13 @@
 #include "shortest_paths.hpp"
 
-#include <limits>
 #include <stdexcept>
-#include <vector>
 
 #include "array_sequence.hpp"
 #include "igraph.hpp"
 #include "list_sequence.hpp"
 
 const int64_t kInf = 1'000'000'000'000'000'000;
-const size_t kNoState = std::numeric_limits<size_t>::max();
+const size_t kNoState = kTransportCount;
 const Transport kSourceTransport = Transport::Feet;
 
 static size_t EncodeState(size_t vertex, Transport transport) {
@@ -112,48 +110,30 @@ PathSteps Dijkstra::GetShortestPathWithTransfers(size_t to) const {
         return nullptr;
     }
 
-    std::vector<size_t> reversed_states;
+    auto res = std::make_shared<ListSequence<PathStep>>();
+    bool reached_source = false;
     for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
-        reversed_states.push_back(state);
+        res->Prepend({DecodeVertex(state), DecodeTransport(state)});
         if (state == from_state_) {
+            reached_source = true;
             break;
         }
     }
-    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+    if (!reached_source) {
         return nullptr;
-    }
-
-    auto res = std::make_shared<ListSequence<PathStep>>();
-    for (size_t i = reversed_states.size(); i > 0; --i) {
-        const size_t state = reversed_states[i - 1];
-        res->Append({DecodeVertex(state), DecodeTransport(state)});
     }
     return res;
 }
 
 SequencePtr<size_t> Dijkstra::GetShortestPath(size_t to) const {
-    if (to >= vertex_count_) {
-        throw std::out_of_range("Target vertex is out of range");
-    }
-    const size_t best_state = FindBestStateAtVertex(dist_, to);
-    if (best_state == kNoState || dist_->Get(best_state) == kInf) {
-        return nullptr;
-    }
-
-    std::vector<size_t> reversed_states;
-    for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
-        reversed_states.push_back(state);
-        if (state == from_state_) {
-            break;
-        }
-    }
-    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+    PathSteps detailed = GetShortestPathWithTransfers(to);
+    if (detailed == nullptr) {
         return nullptr;
     }
 
     auto res = std::make_shared<ListSequence<size_t>>();
-    for (size_t i = reversed_states.size(); i > 0; --i) {
-        const size_t vertex = DecodeVertex(reversed_states[i - 1]);
+    for (auto it = detailed->GetIterator(); it->HasNext(); it->Next()) {
+        const size_t vertex = it->GetCurrentItem().vertex;
         if (res->GetLength() == 0 || res->GetLast() != vertex) {
             res->Append(vertex);
         }
@@ -226,48 +206,30 @@ PathSteps FordBellman::GetShortestPathWithTransfers(size_t to) const {
         return nullptr;
     }
 
-    std::vector<size_t> reversed_states;
+    auto res = std::make_shared<ListSequence<PathStep>>();
+    bool reached_source = false;
     for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
-        reversed_states.push_back(state);
+        res->Prepend({DecodeVertex(state), DecodeTransport(state)});
         if (state == from_state_) {
+            reached_source = true;
             break;
         }
     }
-    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+    if (!reached_source) {
         return nullptr;
-    }
-
-    auto res = std::make_shared<ListSequence<PathStep>>();
-    for (size_t i = reversed_states.size(); i > 0; --i) {
-        const size_t state = reversed_states[i - 1];
-        res->Append({DecodeVertex(state), DecodeTransport(state)});
     }
     return res;
 }
 
 SequencePtr<size_t> FordBellman::GetShortestPath(size_t to) const {
-    if (to >= vertex_count_) {
-        throw std::out_of_range("Target vertex is out of range");
-    }
-    const size_t best_state = FindBestStateAtVertex(dist_, to);
-    if (best_state == kNoState || dist_->Get(best_state) == kInf) {
-        return nullptr;
-    }
-
-    std::vector<size_t> reversed_states;
-    for (size_t state = best_state; state != kNoState; state = prev_->Get(state)) {
-        reversed_states.push_back(state);
-        if (state == from_state_) {
-            break;
-        }
-    }
-    if (reversed_states.empty() || reversed_states.back() != from_state_) {
+    PathSteps detailed = GetShortestPathWithTransfers(to);
+    if (detailed == nullptr) {
         return nullptr;
     }
 
     auto res = std::make_shared<ListSequence<size_t>>();
-    for (size_t i = reversed_states.size(); i > 0; --i) {
-        const size_t vertex = DecodeVertex(reversed_states[i - 1]);
+    for (auto it = detailed->GetIterator(); it->HasNext(); it->Next()) {
+        const size_t vertex = it->GetCurrentItem().vertex;
         if (res->GetLength() == 0 || res->GetLast() != vertex) {
             res->Append(vertex);
         }

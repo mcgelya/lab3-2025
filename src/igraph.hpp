@@ -26,7 +26,7 @@ constexpr std::array<Transport, kTransportCount> kAllTransports = {
     Transport::Feet,
 };
 
-constexpr int64_t kNoTransferCost = std::numeric_limits<int64_t>::max() / 4;
+constexpr int64_t kNoTransferCost = 1'000'000'000'000'000'000;
 
 struct TransferMatrix {
     std::array<std::array<int64_t, kTransportCount>, kTransportCount> cost{};

@@ -140,10 +140,8 @@ int64_t MeasureUs(Algo&& make_algo, size_t target) {
     auto algo = make_algo();
     auto dist = algo.GetDistance(target);
     auto path = algo.GetShortestPath(target);
-    auto details = algo.GetShortestPathWithTransfers(target);
     (void)dist;
     (void)path;
-    (void)details;
     auto end = Clock::now();
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
