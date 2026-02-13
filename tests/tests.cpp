@@ -29,6 +29,15 @@ std::vector<size_t> ArcVertices(const Arcs& arcs) {
     return res;
 }
 
+std::vector<size_t> ArcFromVertices(const Arcs& arcs) {
+    std::vector<size_t> res;
+    auto it = arcs->GetIterator();
+    for (; it->HasNext(); it->Next()) {
+        res.push_back(it->GetCurrentItem().from->id);
+    }
+    return res;
+}
+
 TEST_CASE("Undirected") {
     Graph g(3);
     g.AddEdge({0, 1, 7});
@@ -44,6 +53,9 @@ TEST_CASE("Undirected") {
     REQUIRE(adj0 == std::vector<size_t>{1});
     REQUIRE(adj1 == std::vector<size_t>{0, 2});
     REQUIRE(adj2 == std::vector<size_t>{1});
+    REQUIRE(ArcFromVertices(g.GetArcs(0)) == std::vector<size_t>{0});
+    REQUIRE(ArcFromVertices(g.GetArcs(1)) == std::vector<size_t>{1, 1});
+    REQUIRE(ArcFromVertices(g.GetArcs(2)) == std::vector<size_t>{2});
 }
 
 TEST_CASE("Directed") {
@@ -56,6 +68,7 @@ TEST_CASE("Directed") {
     REQUIRE(ArcVertices(g->GetArcs(0)) == std::vector<size_t>{1});
     REQUIRE(ArcVertices(g->GetArcs(1)).empty());
     REQUIRE(ArcVertices(g->GetArcs(2)).empty());
+    REQUIRE(ArcFromVertices(g->GetArcs(0)) == std::vector<size_t>{0});
 }
 
 TEST_CASE("Dijkstra") {

@@ -75,6 +75,7 @@ struct Edge {
 };
 
 struct Arc {
+    VertexPtr from;
     VertexPtr vertex;
     TransferMatrix transfer;
 

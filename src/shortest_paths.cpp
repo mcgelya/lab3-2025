@@ -7,7 +7,7 @@
 #include "list_sequence.hpp"
 
 const int64_t kInf = 1'000'000'000'000'000'000;
-const size_t kNoState = kTransportCount;
+const size_t kNoState = kInf;
 const Transport kSourceTransport = Transport::Feet;
 
 static size_t EncodeState(size_t vertex, Transport transport) {
