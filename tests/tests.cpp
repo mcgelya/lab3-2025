@@ -134,43 +134,46 @@ TEST_CASE("Unreachable") {
 
 TEST_CASE("TransportStatefulShortestPath") {
     auto edges = std::make_shared<ListSequence<Edge>>();
-
-    TransferMatrix t01;
-    t01.SetCost(Transport::Feet, Transport::Feet, 5);
-    t01.SetCost(Transport::Feet, Transport::Bus, 1);
-    edges->Append(Edge(0, 1, t01));
-
-    TransferMatrix t12;
-    t12.SetCost(Transport::Bus, Transport::Bus, 1);
-    t12.SetCost(Transport::Feet, Transport::Feet, 5);
-    edges->Append(Edge(1, 2, t12));
-
-    TransferMatrix t02 = TransferMatrix::Diagonal(4);
-    edges->Append(Edge(0, 2, t02));
+    edges->Append({0, 1, 1});
+    edges->Append({1, 2, 1});
+    edges->Append({0, 2, 4});
 
     auto g = std::make_shared<DirectedGraph>(3, edges);
+    g->GetVertex(0)->transfer.SetCost(Transport::Feet, Transport::Bus, 0);
 
     Dijkstra dijkstra(g, 0);
     REQUIRE(dijkstra.GetDistance(2) == 2);
     REQUIRE(ToVector(dijkstra.GetShortestPath(2)) == std::vector<size_t>{0, 1, 2});
     auto d_path = ToVector(dijkstra.GetShortestPathWithTransfers(2));
-    REQUIRE(d_path.size() == 3);
+    REQUIRE(d_path.size() == 4);
     REQUIRE(d_path[0].vertex == 0);
     REQUIRE(d_path[0].transport == Transport::Feet);
-    REQUIRE(d_path[1].vertex == 1);
+    REQUIRE(d_path[0].is_transfer == false);
+    REQUIRE(d_path[1].vertex == 0);
     REQUIRE(d_path[1].transport == Transport::Bus);
-    REQUIRE(d_path[2].vertex == 2);
+    REQUIRE(d_path[1].is_transfer == true);
+    REQUIRE(d_path[2].vertex == 1);
     REQUIRE(d_path[2].transport == Transport::Bus);
+    REQUIRE(d_path[2].is_transfer == false);
+    REQUIRE(d_path[3].vertex == 2);
+    REQUIRE(d_path[3].transport == Transport::Bus);
+    REQUIRE(d_path[3].is_transfer == false);
 
     FordBellman bellman(g, 0);
     REQUIRE(bellman.GetDistance(2) == 2);
     REQUIRE(ToVector(bellman.GetShortestPath(2)) == std::vector<size_t>{0, 1, 2});
     auto b_path = ToVector(bellman.GetShortestPathWithTransfers(2));
-    REQUIRE(b_path.size() == 3);
+    REQUIRE(b_path.size() == 4);
     REQUIRE(b_path[0].vertex == 0);
     REQUIRE(b_path[0].transport == Transport::Feet);
-    REQUIRE(b_path[1].vertex == 1);
+    REQUIRE(b_path[0].is_transfer == false);
+    REQUIRE(b_path[1].vertex == 0);
     REQUIRE(b_path[1].transport == Transport::Bus);
-    REQUIRE(b_path[2].vertex == 2);
+    REQUIRE(b_path[1].is_transfer == true);
+    REQUIRE(b_path[2].vertex == 1);
     REQUIRE(b_path[2].transport == Transport::Bus);
+    REQUIRE(b_path[2].is_transfer == false);
+    REQUIRE(b_path[3].vertex == 2);
+    REQUIRE(b_path[3].transport == Transport::Bus);
+    REQUIRE(b_path[3].is_transfer == false);
 }

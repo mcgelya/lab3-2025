@@ -130,7 +130,11 @@ void PrintPathWithTransfers(const PathSteps& path) {
     std::cout << "  details:\n";
     for (auto it = path->GetIterator(); it->HasNext(); it->Next()) {
         const PathStep step = it->GetCurrentItem();
-        std::cout << "    v=" << step.vertex << " transport=" << TransportName(step.transport) << "\n";
+        std::cout << "    v=" << step.vertex << " transport=" << TransportName(step.transport);
+        if (step.is_transfer) {
+            std::cout << " [transfer]";
+        }
+        std::cout << "\n";
     }
 }
 

@@ -7,6 +7,7 @@
 struct PathStep {
     size_t vertex = 0;
     Transport transport = Transport::Feet;
+    bool is_transfer = false;
 };
 
 using PathSteps = SequencePtr<PathStep>;

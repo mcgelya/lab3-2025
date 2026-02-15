@@ -63,48 +63,48 @@ struct TransferMatrix {
 };
 
 struct Edge {
-    Edge(size_t u_, size_t v_, int64_t w = 1) : u(u_), v(v_), transfer(TransferMatrix::Diagonal(w)) {
-    }
-
-    Edge(size_t u_, size_t v_, const TransferMatrix& transfer_) : u(u_), v(v_), transfer(transfer_) {
+    Edge(size_t u_, size_t v_, int64_t w = 1) : u(u_), v(v_), weight(w) {
     }
 
     size_t u;
     size_t v;
-    TransferMatrix transfer;
+    int64_t weight;
+};
+
+struct AccumulatedPath {
+    int64_t total_cost = 0;
+
+    bool Combine(int64_t delta_cost, AccumulatedPath& combined) const {
+        if (delta_cost > 0 && total_cost > std::numeric_limits<int64_t>::max() - delta_cost) {
+            return false;
+        }
+        if (delta_cost < 0 && total_cost < std::numeric_limits<int64_t>::min() - delta_cost) {
+            return false;
+        }
+        combined = *this;
+        combined.total_cost = total_cost + delta_cost;
+        return true;
+    }
 };
 
 struct Arc {
     VertexPtr from;
     VertexPtr vertex;
-    TransferMatrix transfer;
-
-    bool Combine(int64_t current_weight, Transport from, Transport to, int64_t& combined_weight) const {
-        const int64_t step_cost = transfer.GetCost(from, to);
-        if (step_cost >= kNoTransferCost) {
-            return false;
-        }
-        if (step_cost > 0 && current_weight > std::numeric_limits<int64_t>::max() - step_cost) {
-            return false;
-        }
-        if (step_cost < 0 && current_weight < std::numeric_limits<int64_t>::min() - step_cost) {
-            return false;
-        }
-        combined_weight = current_weight + step_cost;
-        return true;
-    }
+    int64_t weight;
 };
 
 using Arcs = SequencePtr<Arc>;
 
 struct Vertex {
-    explicit Vertex(size_t id_) : id(id_), arcs(std::make_shared<ListSequence<Arc>>()) {
+    explicit Vertex(size_t id_, const TransferMatrix& transfer_ = TransferMatrix::Diagonal(0))
+        : id(id_), transfer(transfer_), arcs(std::make_shared<ListSequence<Arc>>()) {
     }
 
     Vertex() : Vertex(0) {
     }
 
     size_t id;
+    TransferMatrix transfer;
     Arcs arcs;
 };
 
